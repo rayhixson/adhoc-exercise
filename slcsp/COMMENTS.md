@@ -2,7 +2,7 @@
 
 See requirements in data/README.md
 
-## Intall Go
+## Intall Go 1.14 (may work with earlier versions)
 https://golang.org/doc/install
 
 ## Run

@@ -4,68 +4,74 @@ import (
 	"testing"
 )
 
-var zips Zips
-var plans Plans
+var zipsFromFile Zips
+var plansFromFile Plans
+
+func init() {
+	zipsFromFile = LoadZips("data/zips.csv")
+	plansFromFile = LoadPlans("data/plans.csv")
+}
+
+type Data struct {
+	TestZips  Zips
+	TestPlans Plans
+}
 
 // TestGiven tests examples given in the requirements
 func TestGiven(t *testing.T) {
-	zips = LoadZips()
-	plans = LoadPlans()
-	expect(t, "64148", 245.20)
-	expect(t, "40813", 0)
+	d := Data{zipsFromFile, plansFromFile}
+	expect(t, d, "64148", 245.20)
+	expect(t, d, "40813", 0)
 }
 
 // TestMoreThanOneRateArea checks for 0 because this is ambiguous per requirements
 func TestMoreThanOneRateArea(t *testing.T) {
-	zips = makeZips()
-	plans = makePlans()
-	expect(t, "36804", 0)
+	d := Data{makeZips(), makePlans()}
+	expect(t, d, "36804", 0)
 }
 
 // TestTwoZips specifies two zips in the same rate area - should then match plans
 func TestTwoZips(t *testing.T) {
-	zips = Zips{
-		Zip{"36804", "AL", "01017", "Chambers", "13"},
-		Zip{"36804", "AL", "01087", "Macon", "13"},
+	d := Data{
+		Zips{
+			Zip{"36804", "AL", "01017", "Chambers", "13"},
+			Zip{"36804", "AL", "01087", "Macon", "13"},
+		},
+		makePlans(),
 	}
-	plans = makePlans()
 
-	expect(t, "36804", 253.37)
+	expect(t, d, "36804", 253.37)
 }
 
 // TestFromData is from manual confirming some values
 func TestFromData(t *testing.T) {
-	zips = LoadZips()
-	plans = LoadPlans()
+	d := Data{zipsFromFile, plansFromFile}
 
-	expect(t, "67118", 212.35)
-	expect(t, "48435", 0)
-	expect(t, "31551", 290.6)
+	expect(t, d, "67118", 212.35)
+	expect(t, d, "48435", 0)
+	expect(t, d, "31551", 290.6)
 }
 
 func TestNoPlan(t *testing.T) {
-	zips = Zips{{"35956", "AL", "01055", "Etowah", "8"}}
-	plans = Plans{}
+	d := Data{Zips{{"35956", "AL", "01055", "Etowah", "8"}}, Plans{}}
 
-	expect(t, "35956", 0)
+	expect(t, d, "35956", 0)
 }
 
 func TestOnePlan(t *testing.T) {
-	zips = Zips{{"35956", "AL", "01055", "Etowah", "8"}}
-	plans = Plans{{"52161YL6358432", "AL", "Silver", 245.82, "8"}}
+	d := Data{Zips{{"35956", "AL", "01055", "Etowah", "8"}}, Plans{{"52161YL6358432", "AL", "Silver", 245.82, "8"}}}
 
-	expect(t, "35956", 0)
+	expect(t, d, "35956", 0)
 }
 
 func TestTwoPlans(t *testing.T) {
-	zips = makeZips()
-	plans = makePlans()
+	d := Data{makeZips(), makePlans()}
 
-	expect(t, "36749", 245.83)
+	expect(t, d, "36749", 245.83)
 }
 
-func expect(t *testing.T, zip string, rate float64) {
-	finder := SlcspFinder{zips, plans}
+func expect(t *testing.T, data Data, zip string, rate float64) {
+	finder := SlcspFinder{data.TestZips, data.TestPlans}
 	foundRate := finder.Find(zip)
 	if foundRate != rate {
 		t.Errorf("Want: %v -> Got: %v", rate, foundRate)

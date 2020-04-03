@@ -10,14 +10,15 @@ import (
 	"strconv"
 )
 
-const zipsFile = "data/zips.csv"
-const plansFile = "data/plans.csv"
-const inputFile = "data/slcsp.csv"
 const Silver = "Silver"
 
 func main() {
-	zips := LoadZips()
-	plans := LoadPlans()
+	const zipsFile = "data/zips.csv"
+	const plansFile = "data/plans.csv"
+	const inputFile = "data/slcsp.csv"
+
+	zips := LoadZips(zipsFile)
+	plans := LoadPlans(plansFile)
 	finder := SlcspFinder{zips, plans}
 
 	rows := [][]string{}
@@ -71,7 +72,7 @@ type Zip struct {
 type Zips []Zip
 
 // FindInOneRateArea returns all the zip records that match the supplied zip but only
-// if they are in the same RateArea
+// if they are in the same RateArea, otherwise none
 func (zips Zips) FindInOneRateArea(zip string) (matches Zips) {
 	area := ""
 	for _, z := range zips {
@@ -140,7 +141,7 @@ func (plans Plans) SecondLowestRate() float64 {
 	return 0
 }
 
-func LoadZips() (allZips Zips) {
+func LoadZips(file string) (allZips Zips) {
 	zipHandler := func(record []string) error {
 		if len(record) < 5 {
 			return fmt.Errorf("Zip expects 5 fields: %v", record)
@@ -154,11 +155,11 @@ func LoadZips() (allZips Zips) {
 		})
 		return nil
 	}
-	loadFile(zipsFile, zipHandler)
+	loadFile(file, zipHandler)
 	return allZips
 }
 
-func LoadPlans() (allPlans Plans) {
+func LoadPlans(file string) (allPlans Plans) {
 	planHandler := func(record []string) error {
 		if len(record) < 5 {
 			return fmt.Errorf("Plan expects 5 fields: %v", record)
@@ -177,7 +178,7 @@ func LoadPlans() (allPlans Plans) {
 		})
 		return nil
 	}
-	loadFile(plansFile, planHandler)
+	loadFile(file, planHandler)
 	return allPlans
 }
 
@@ -198,7 +199,7 @@ func loadFile(fileName string, recordHandler func(record []string) error) {
 			break
 		}
 		if err != nil {
-			panic(fmt.Sprintf("Failed to read %v: %v", zipsFile, err))
+			panic(fmt.Sprintf("Failed to read %v: %v", fileName, err))
 		}
 
 		if readHeader {

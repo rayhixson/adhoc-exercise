@@ -141,70 +141,68 @@ func (plans Plans) SecondLowestRate() float64 {
 }
 
 func LoadZips() (allZips Zips) {
-	deserializer := func(r []string) error {
-		if len(r) < 5 {
-			return errors.New("Zip expects 5 fields")
+	zipHandler := func(record []string) error {
+		if len(record) < 5 {
+			return fmt.Errorf("Zip expects 5 fields: %v", record)
 		}
-		z := Zip{
-			Code:       r[0],
-			State:      r[1],
-			CountyCode: r[2],
-			Name:       r[3],
-			RateArea:   r[4],
-		}
-		allZips = append(allZips, z)
+		allZips = append(allZips, Zip{
+			Code:       record[0],
+			State:      record[1],
+			CountyCode: record[2],
+			Name:       record[3],
+			RateArea:   record[4],
+		})
 		return nil
 	}
-	loadFile(zipsFile, deserializer)
+	loadFile(zipsFile, zipHandler)
 	return allZips
 }
 
 func LoadPlans() (allPlans Plans) {
-	deserializer := func(r []string) error {
-		if len(r) < 5 {
-			return errors.New("Plan expects 5 fields")
+	planHandler := func(record []string) error {
+		if len(record) < 5 {
+			return fmt.Errorf("Plan expects 5 fields: %v", record)
 		}
-		rate, err := strconv.ParseFloat(r[3], 64)
+		rate, err := strconv.ParseFloat(record[3], 64)
 		if err != nil {
-			fmt.Println(r)
-			return err
+			return fmt.Errorf("Processing record %v -> %w", record, err)
 		}
 
-		p := Plan{
-			ID:         r[0],
-			State:      r[1],
-			MetalLevel: r[2],
+		allPlans = append(allPlans, Plan{
+			ID:         record[0],
+			State:      record[1],
+			MetalLevel: record[2],
 			Rate:       rate,
-			RateArea:   r[4],
-		}
-		allPlans = append(allPlans, p)
+			RateArea:   record[4],
+		})
 		return nil
 	}
-	loadFile(plansFile, deserializer)
+	loadFile(plansFile, planHandler)
 	return allPlans
 }
 
-func loadFile(fileName string, deserializeFunc func(r []string) error) {
+// loadFile panics if file is missing since these are considered crucial to the app
+func loadFile(fileName string, recordHandler func(record []string) error) {
 	file, err := os.Open(fileName)
 	if err != nil {
 		panic("Expected file: " + fileName)
 	}
 	defer file.Close()
 
-	r := csv.NewReader(file)
+	reader := csv.NewReader(file)
 	readHeader := false
 
 	for {
-		record, err := r.Read()
+		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			panic("Failed to read: " + zipsFile)
+			panic(fmt.Sprintf("Failed to read %v: %v", zipsFile, err))
 		}
 
 		if readHeader {
-			if err = deserializeFunc(record); err != nil {
+			if err = recordHandler(record); err != nil {
 				panic("Can't deserialize field: " + err.Error())
 			}
 		} else {

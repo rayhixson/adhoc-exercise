@@ -7,11 +7,12 @@ import (
 var zips Zips
 var plans Plans
 
-// TestGiven is an example that was given in the requirements
+// TestGiven tests examples given in the requirements
 func TestGiven(t *testing.T) {
 	zips = LoadZips()
 	plans = LoadPlans()
 	expect(t, "64148", 245.20)
+	expect(t, "40813", 0)
 }
 
 // TestMoreThanOneRateArea checks for 0 because this is ambiguous per requirements

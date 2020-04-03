@@ -30,7 +30,7 @@ func main() {
 		rate := finder.Find(zip)
 		strrate := ""
 		if rate > 0 {
-			strrate = fmt.Sprintf("%v", rate)
+			strrate = fmt.Sprintf("%.2f", rate)
 		}
 		rows = append(rows, []string{zip, strrate})
 		return nil
@@ -57,12 +57,8 @@ func (s SlcspFinder) Find(givenZip string) float64 {
 		// all zips are in the same rate area, so just pick one
 		plansForZip = s.AllPlans.SilverPlans(matchingZips[0].State, matchingZips[0].RateArea)
 	}
-	slcsp := plansForZip.Slcsp()
 
-	if slcsp == nil {
-		return 0
-	}
-	return slcsp.Rate
+	return plansForZip.SecondLowestRate()
 }
 
 type Zip struct {
@@ -103,6 +99,7 @@ type Plan struct {
 }
 type Plans []Plan
 
+// SilverPlans returns a list of Silver plans for the state and rateArea
 func (plans Plans) SilverPlans(state, rateArea string) (matches Plans) {
 	for _, p := range plans {
 		if p.State == state &&
@@ -116,7 +113,10 @@ func (plans Plans) SilverPlans(state, rateArea string) (matches Plans) {
 	return matches
 }
 
-func (plans Plans) Slcsp() *Plan {
+// SecondLowestRate returns the Second Lowest Cost Plan Rate for the set
+// It filters out duplicate rates
+// It returns 0 if there is only one plan
+func (plans Plans) SecondLowestRate() float64 {
 	// first remove duplicates by rate
 	uniqRates := make(map[float64]bool)
 	sorted := Plans{}
@@ -134,10 +134,10 @@ func (plans Plans) Slcsp() *Plan {
 			return sorted[i].Rate < sorted[j].Rate
 		})
 
-		return &sorted[1]
+		return sorted[1].Rate
 	}
 
-	return nil
+	return 0
 }
 
 func LoadZips() (allZips Zips) {

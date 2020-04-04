@@ -12,6 +12,7 @@ import (
 
 const Silver = "Silver"
 
+// See data/README.md for requirements driving this app
 func main() {
 	const zipsFile = "data/zips.csv"
 	const plansFile = "data/plans.csv"
@@ -19,16 +20,17 @@ func main() {
 
 	zips := LoadZips(zipsFile)
 	plans := LoadPlans(plansFile)
-	finder := SlcspFinder{zips, plans}
+	slcsp := SlcspFinder{zips, plans}
 
+	// read input file
 	rows := [][]string{}
 	rowHandler := func(record []string) error {
 		if len(record) != 2 {
-			return errors.New(fmt.Sprintf("Expect 1 field with a zip: %v", record))
+			return errors.New(fmt.Sprintf("Expecting 2 fields: %v", record))
 		}
 
 		zip := record[0]
-		rate := finder.Find(zip)
+		rate := slcsp.FindRate(zip)
 		strrate := ""
 		if rate > 0 {
 			strrate = fmt.Sprintf("%.2f", rate)
@@ -50,7 +52,7 @@ type SlcspFinder struct {
 	AllPlans Plans
 }
 
-func (s SlcspFinder) Find(givenZip string) float64 {
+func (s SlcspFinder) FindRate(givenZip string) float64 {
 	matchingZips := s.AllZips.FindInOneRateArea(givenZip)
 
 	plansForZip := Plans{}
@@ -100,7 +102,7 @@ type Plan struct {
 }
 type Plans []Plan
 
-// SilverPlans returns a list of Silver plans for the state and rateArea
+// SilverPlans returns a list of Silver plans for the state and rateArea.
 func (plans Plans) SilverPlans(state, rateArea string) (matches Plans) {
 	for _, p := range plans {
 		if p.State == state &&
@@ -114,9 +116,9 @@ func (plans Plans) SilverPlans(state, rateArea string) (matches Plans) {
 	return matches
 }
 
-// SecondLowestRate returns the Second Lowest Cost Plan Rate for the set
-// It filters out duplicate rates
-// It returns 0 if there is only one plan
+// SecondLowestRate returns the Second Lowest Cost Plan Rate for the set of Plans.
+// It filters out duplicate rates.
+// It returns 0 if there is only one plan.
 func (plans Plans) SecondLowestRate() float64 {
 	// first remove duplicates by rate
 	uniqRates := make(map[float64]bool)
@@ -182,7 +184,9 @@ func LoadPlans(file string) (allPlans Plans) {
 	return allPlans
 }
 
-// loadFile panics if file is missing since these are considered crucial to the app
+// loadFile loads a csv file passing each row/record to the handler.
+// It assumes the first row of the file is a header row
+// It panics if file is missing since these are considered crucial to the app.
 func loadFile(fileName string, recordHandler func(record []string) error) {
 	file, err := os.Open(fileName)
 	if err != nil {

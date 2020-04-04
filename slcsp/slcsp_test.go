@@ -30,7 +30,7 @@ func TestMoreThanOneRateArea(t *testing.T) {
 	expect(t, d, "36804", 0)
 }
 
-// TestTwoZips specifies two zips in the same rate area - should then match plans
+// TestTwoZips specifies two zips in the same rate area, which should then match plans and not 0
 func TestTwoZips(t *testing.T) {
 	d := Data{
 		Zips{
@@ -43,7 +43,7 @@ func TestTwoZips(t *testing.T) {
 	expect(t, d, "36804", 253.37)
 }
 
-// TestFromData is from manual confirming some values
+// TestFromData is from manually confirming some values
 func TestFromData(t *testing.T) {
 	d := Data{zipsFromFile, plansFromFile}
 
@@ -52,18 +52,21 @@ func TestFromData(t *testing.T) {
 	expect(t, d, "31551", 290.6)
 }
 
+// TestNoPlan checks for 0 when no plan is matches
 func TestNoPlan(t *testing.T) {
 	d := Data{Zips{{"35956", "AL", "01055", "Etowah", "8"}}, Plans{}}
 
 	expect(t, d, "35956", 0)
 }
 
+// TestOnePlan tests for 0 when there is exactly one plan matched
 func TestOnePlan(t *testing.T) {
 	d := Data{Zips{{"35956", "AL", "01055", "Etowah", "8"}}, Plans{{"52161YL6358432", "AL", "Silver", 245.82, "8"}}}
 
 	expect(t, d, "35956", 0)
 }
 
+// TestTwoPlans tests for correct value when two plans match
 func TestTwoPlans(t *testing.T) {
 	d := Data{makeZips(), makePlans()}
 
@@ -72,7 +75,7 @@ func TestTwoPlans(t *testing.T) {
 
 func expect(t *testing.T, data Data, zip string, rate float64) {
 	finder := SlcspFinder{data.TestZips, data.TestPlans}
-	foundRate := finder.Find(zip)
+	foundRate := finder.FindRate(zip)
 	if foundRate != rate {
 		t.Errorf("Want: %v -> Got: %v", rate, foundRate)
 	}

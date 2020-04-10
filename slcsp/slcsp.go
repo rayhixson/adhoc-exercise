@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -12,11 +12,17 @@ import (
 
 const Silver = "Silver"
 
-// See data/README.md for requirements driving this app
+// Given a file with zip codes, determine the second lowest cost silver plan
+// for that zip code. Print out the zip along with the rate; blank for the rate
+// if there is none or there is no definitive answer.
+// See data/README.md for requirement details
 func main() {
+	// input that we will later print out along with rates
+	const inputFile = "data/slcsp.csv"
+
+	// reference data
 	const zipsFile = "data/zips.csv"
 	const plansFile = "data/plans.csv"
-	const inputFile = "data/slcsp.csv"
 
 	zips := LoadZips(zipsFile)
 	plans := LoadPlans(plansFile)
@@ -26,16 +32,16 @@ func main() {
 	rows := [][]string{}
 	rowHandler := func(record []string) error {
 		if len(record) != 2 {
-			return errors.New(fmt.Sprintf("Expecting 2 fields: %v", record))
+			return fmt.Errorf("Expecting 2 fields: %v", record)
 		}
 
 		zip := record[0]
 		rate := slcsp.FindRate(zip)
-		strrate := ""
+		stringRate := ""
 		if rate > 0 {
-			strrate = fmt.Sprintf("%.2f", rate)
+			stringRate = fmt.Sprintf("%.2f", rate)
 		}
-		rows = append(rows, []string{zip, strrate})
+		rows = append(rows, []string{zip, stringRate})
 		return nil
 	}
 	loadFile(inputFile, rowHandler)
@@ -47,11 +53,13 @@ func main() {
 	}
 }
 
+// SlcspFinder has a list of zips and a list of plans and finds rates given zips
 type SlcspFinder struct {
 	AllZips  Zips
 	AllPlans Plans
 }
 
+// FindRate returns the second lowest cost silver plan for the given zip if there is a definitive one
 func (s SlcspFinder) FindRate(givenZip string) float64 {
 	matchingZips := s.AllZips.FindInOneRateArea(givenZip)
 
@@ -74,15 +82,15 @@ type Zip struct {
 type Zips []Zip
 
 // FindInOneRateArea returns all the zip records that match the supplied zip but only
-// if they are in the same RateArea, otherwise none
+// if they are in the same State and RateArea, otherwise none
 func (zips Zips) FindInOneRateArea(zip string) (matches Zips) {
 	area := ""
 	for _, z := range zips {
 		if z.Code == zip {
 			if area == "" {
-				area = z.RateArea
+				area = z.State + z.RateArea
 			}
-			if area != z.RateArea {
+			if area != (z.State + z.RateArea) {
 				// ambiguous situation, return none
 				return Zips{}
 			}
@@ -132,11 +140,11 @@ func (plans Plans) SecondLowestRate() float64 {
 
 	// if there is more than one then sort and return second lowest
 	if len(sorted) > 1 {
-		// sort for second last
 		sort.Slice(sorted, func(i, j int) bool {
 			return sorted[i].Rate < sorted[j].Rate
 		})
 
+		// second lowest
 		return sorted[1].Rate
 	}
 
@@ -186,11 +194,11 @@ func LoadPlans(file string) (allPlans Plans) {
 
 // loadFile loads a csv file passing each row/record to the handler.
 // It assumes the first row of the file is a header row
-// It panics if file is missing since these are considered crucial to the app.
+// It panics if file is missing since these are considered critical to the app.
 func loadFile(fileName string, recordHandler func(record []string) error) {
 	file, err := os.Open(fileName)
 	if err != nil {
-		panic("Expected file: " + fileName)
+		log.Panicln("Expected file:", fileName)
 	}
 	defer file.Close()
 
@@ -203,12 +211,12 @@ func loadFile(fileName string, recordHandler func(record []string) error) {
 			break
 		}
 		if err != nil {
-			panic(fmt.Sprintf("Failed to read %v: %v", fileName, err))
+			log.Panicln("Failed to read:", fileName, err)
 		}
 
 		if readHeader {
 			if err = recordHandler(record); err != nil {
-				panic("Can't deserialize field: " + err.Error())
+				log.Panicf("Can't deserialize field [%v] : %v", record, err)
 			}
 		} else {
 			readHeader = true

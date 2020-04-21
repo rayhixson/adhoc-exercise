@@ -8,33 +8,35 @@ import (
 	"os"
 )
 
-const logFileName = "txnlog.dat"
-const MagicValue = "MPS7"
-const SpecialUser = uint64(2456938384156277127)
+const LogFileName = "txnlog.dat"
+const HeaderMagicValue = "MPS7"
+const SpecialUserID = 2456938384156277127
 
 type RecordType byte
 
 const (
-	Debit        = 0
-	Credit       = 1
-	StartAutopay = 2
-	EndAutopay   = 3
+	DebitType        RecordType = 0x00
+	CreditType                  = 0x01
+	StartAutopayType            = 0x02
+	EndAutopayType              = 0x03
 )
 
+// Header is the first line of the transaction log
 type Header struct {
 	Magic       [4]byte
 	Version     byte
-	RecordCount [4]byte
+	RecordCount uint32
 }
 
-type Record struct {
-	Type      byte
-	Timestamp [4]byte
-	UserID    [8]byte
+// MinRecord is the set of fields that all records have in common; some also have an amount
+type MinRecord struct {
+	Type      RecordType
+	Timestamp uint32
+	UserID    uint64
 }
 
+// Sum is used to track the summary info of the log
 type Sum struct {
-	UserID        uint64
 	Credits       float64
 	Debits        float64
 	AutopayStarts int64
@@ -43,88 +45,79 @@ type Sum struct {
 }
 
 func main() {
-	logFile, err := os.Open(logFileName)
+	logFile, err := os.Open(LogFileName)
 	if err != nil {
 		log.Panic("Unable to read log file", err)
 	}
 	defer logFile.Close()
 
+	// read the header first
 	h := Header{}
 	err = binary.Read(logFile, binary.BigEndian, &h)
 	if err != nil {
 		log.Panic("Bad header read", err)
 	}
 
-	if string(h.Magic[:]) != MagicValue {
+	if string(h.Magic[:]) != HeaderMagicValue {
 		log.Panic("Bad Magic")
 	}
 
-	recCount := binary.BigEndian.Uint32(h.RecordCount[:])
-	fmt.Printf("Header: %v, %v, %v\n", string(h.Magic[:]),
-		h.Version,
-		recCount)
-
-	sum := Sum{UserID: SpecialUser}
-	for i := uint32(0); i < recCount; i++ {
-		err := ReadRecord(logFile, &sum)
-		if err != nil {
+	// read each record and store summary info
+	sum := Sum{}
+	for i := uint32(0); i < h.RecordCount; i++ {
+		if err := readRecord(logFile, &sum); err != nil {
 			log.Panic("Bad read", err)
 		}
 	}
 
-	fmt.Printf("total credit amount=%.2f\ntotal debit amount=%.2f\nautopays started=%d\nautopays ended=%d\nbalance for user %d=%.2f",
+	fmt.Printf(`
+total credit amount=%.2f
+total debit amount=%.2f
+autopays started=%d
+autopays ended=%d
+balance for user %d=%.2f
+`,
 		sum.Credits,
 		sum.Debits,
 		sum.AutopayStarts,
 		sum.AutopayEnds,
-		sum.UserID,
+		SpecialUserID,
 		sum.UserBalance)
 }
 
-func ReadRecord(buf io.Reader, sum *Sum) (err error) {
-	rec := Record{}
-	err = binary.Read(buf, binary.BigEndian, &rec)
-
-	if err != nil {
+// ReadRecord consumes a record in the provided buf and captures summary info from that record
+// Returns an error if it can't read the record or doesn't recognize the transaction type
+func readRecord(buf io.Reader, sum *Sum) (err error) {
+	rec := MinRecord{}
+	if err = binary.Read(buf, binary.BigEndian, &rec); err != nil {
 		return err
 	}
 
-	var amount float64
-
 	switch rec.Type {
-	case Debit:
+	case DebitType, CreditType:
+		// then we also need to read the amount for this transaction
+		var amount float64
 		binary.Read(buf, binary.BigEndian, &amount)
-		sum.Debits += amount
 
-		if binary.BigEndian.Uint64(rec.UserID[:]) == SpecialUser {
-			sum.UserBalance -= amount
+		if rec.Type == DebitType {
+			sum.Debits += amount
+			amount = -1 * amount
+		} else {
+			sum.Credits += amount
 		}
 
-	case Credit:
-		binary.Read(buf, binary.BigEndian, &amount)
-		sum.Credits += amount
-
-		if binary.BigEndian.Uint64(rec.UserID[:]) == SpecialUser {
+		if rec.UserID == SpecialUserID {
 			sum.UserBalance += amount
 		}
 
-		fmt.Println(amount)
-	case StartAutopay:
+	case StartAutopayType:
 		sum.AutopayStarts++
 
-	case EndAutopay:
+	case EndAutopayType:
 		sum.AutopayEnds++
 	default:
 		return fmt.Errorf("Unknown tran type: %v", rec.Type)
 	}
-
-	/*
-		fmt.Printf("%v, %v, %v, %v\n",
-			rec.Type,
-			binary.BigEndian.Uint32(rec.Timestamp[:]),
-			binary.BigEndian.Uint64(rec.UserID[:]),
-			amount)
-	*/
 
 	return nil
 }
